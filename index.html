@@ -80,7 +80,7 @@
             width: 100%;
         }
 
-        /* Estilo da barra deslizante (Slider) */
+        /* Estilo das barras deslizantes (Sliders) */
         input[type="range"] {
             flex-grow: 1;
             cursor: pointer;
@@ -101,7 +101,7 @@
             cursor: pointer;
         }
 
-        .speed-display {
+        .slider-display {
             width: 80px;
             text-align: right;
             font-weight: bold;
@@ -136,7 +136,7 @@
 
         #text-container {
             padding: 50vh 10% 50vh 10%; 
-            font-size: 80px;
+            font-size: 80px; /* Tamanho padrão, será alterado via JS */
             line-height: 1.4;
             font-weight: bold;
             text-align: center;
@@ -175,9 +175,12 @@
             padding: 12px 20px;
             border-radius: 8px;
             border: 1px solid #444;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            max-width: 90vw;
         }
 
-        .float-speed-container {
+        .float-slider-container {
             display: flex;
             align-items: center;
             gap: 10px;
@@ -195,8 +198,12 @@
             cursor: pointer;
         }
         .float-btn:hover { background: #555; }
+        
         .play-btn { background: #059669; border-color: #047857; min-width: 140px; }
         .play-btn:hover { background: #047857; }
+        
+        .fs-btn { background: #6366f1; border-color: #4f46e5; }
+        .fs-btn:hover { background: #4f46e5; }
         
         #status-indicator {
             position: fixed;
@@ -223,16 +230,23 @@
             <textarea id="input-text" placeholder="Cole o texto..."></textarea>
             
             <div class="controls-group">
-                <!-- Controle de Velocidade com Slider -->
+                <!-- Controle de Velocidade -->
                 <div class="control-row">
                     <label>Velocidade:</label>
                     <input type="range" id="setup-speed-slider" min="50" max="300" value="130">
-                    <span id="setup-speed-display" class="speed-display">130 PPM</span>
+                    <span id="setup-speed-display" class="slider-display">130 PPM</span>
+                </div>
+                
+                <!-- Controle de Tamanho da Letra -->
+                <div class="control-row">
+                    <label>Tamanho da Letra:</label>
+                    <input type="range" id="setup-font-slider" min="40" max="150" value="80">
+                    <span id="setup-font-display" class="slider-display">80px</span>
                 </div>
                 
                 <hr style="width: 100%; border: 1px solid #333; margin: 5px 0;">
                 
-                <p style="margin: 0; color: #aaa; font-size: 14px;">Opções de Espelhamento (Testar na câmera):</p>
+                <p style="margin: 0; color: #aaa; font-size: 14px;">Opções de Espelhamento:</p>
                 <div class="control-row" style="justify-content: flex-start;">
                     <input type="checkbox" id="mirror-x">
                     <label for="mirror-x">Espelhar Horizontal (Esquerda/Direita)</label>
@@ -252,13 +266,20 @@
         <div id="status-indicator">PAUSADO</div>
         
         <div id="floating-controls">
-            <!-- Ajuste de velocidade direto na tela de leitura -->
-            <div class="float-speed-container">
-                <span style="font-size: 14px;">Velocidade:</span>
+            <!-- Tamanho da Letra Flutuante -->
+            <div class="float-slider-container">
+                <span style="font-size: 14px;">Letra:</span>
+                <input type="range" id="float-font-slider" min="40" max="150" value="80" style="width: 80px;">
+            </div>
+
+            <!-- Velocidade Flutuante -->
+            <div class="float-slider-container">
+                <span style="font-size: 14px;">Veloc:</span>
                 <input type="range" id="float-speed-slider" min="50" max="300" value="130" style="width: 100px;">
-                <span id="float-speed-display" class="speed-display" style="width: 65px;">130</span>
+                <span id="float-speed-display" class="slider-display" style="width: 35px; font-size: 14px;">130</span>
             </div>
             
+            <button class="float-btn fs-btn" id="fs-btn" onclick="toggleFullScreen()">Tela Cheia</button>
             <button class="float-btn" onclick="stopTeleprompter()">Voltar</button>
             <button class="float-btn play-btn" id="play-pause-btn" onclick="togglePlay()">Play (Espaço)</button>
         </div>
@@ -278,29 +299,50 @@
         const textContainer = document.getElementById('text-container');
         const playPauseBtn = document.getElementById('play-pause-btn');
         const statusIndicator = document.getElementById('status-indicator');
+        const fsBtn = document.getElementById('fs-btn');
 
-        // Sincronização dos Sliders (Tela inicial <-> Tela Teleprompter)
-        const setupSlider = document.getElementById('setup-speed-slider');
-        const setupDisplay = document.getElementById('setup-speed-display');
-        const floatSlider = document.getElementById('float-speed-slider');
-        const floatDisplay = document.getElementById('float-speed-display');
+        // Sincronização Velocidade
+        const setupSpeedSlider = document.getElementById('setup-speed-slider');
+        const setupSpeedDisplay = document.getElementById('setup-speed-display');
+        const floatSpeedSlider = document.getElementById('float-speed-slider');
+        const floatSpeedDisplay = document.getElementById('float-speed-display');
+
+        // Sincronização Tamanho da Letra
+        const setupFontSlider = document.getElementById('setup-font-slider');
+        const setupFontDisplay = document.getElementById('setup-font-display');
+        const floatFontSlider = document.getElementById('float-font-slider');
 
         function updateSpeed(value) {
             currentPPM = parseInt(value);
-            setupSlider.value = currentPPM;
-            setupDisplay.innerText = currentPPM + " PPM";
-            floatSlider.value = currentPPM;
-            floatDisplay.innerText = currentPPM;
+            setupSpeedSlider.value = currentPPM;
+            setupSpeedDisplay.innerText = currentPPM + " PPM";
+            floatSpeedSlider.value = currentPPM;
+            floatSpeedDisplay.innerText = currentPPM;
 
-            // Se alterar a velocidade enquanto estiver rodando, atualiza o ritmo em tempo real
             if (isPlaying) {
                 clearInterval(intervalId);
                 startInterval();
             }
         }
 
-        setupSlider.addEventListener('input', (e) => updateSpeed(e.target.value));
-        floatSlider.addEventListener('input', (e) => updateSpeed(e.target.value));
+        function updateFontSize(value) {
+            setupFontSlider.value = value;
+            setupFontDisplay.innerText = value + "px";
+            floatFontSlider.value = value;
+            textContainer.style.fontSize = value + "px";
+            
+            // Re-centraliza a palavra atual se a letra mudar de tamanho durante o play
+            if (currentIndex > 0) {
+                const targetWord = document.getElementById(`word-${currentIndex}`);
+                if (targetWord) targetWord.scrollIntoView({ behavior: 'auto', block: 'center' });
+            }
+        }
+
+        setupSpeedSlider.addEventListener('input', (e) => updateSpeed(e.target.value));
+        floatSpeedSlider.addEventListener('input', (e) => updateSpeed(e.target.value));
+        
+        setupFontSlider.addEventListener('input', (e) => updateFontSize(e.target.value));
+        floatFontSlider.addEventListener('input', (e) => updateFontSize(e.target.value));
 
         function startTeleprompter() {
             const rawText = document.getElementById('input-text').value.trim();
@@ -341,6 +383,9 @@
             isPlaying = false;
             updatePlayBtnUI();
             
+            // Aplica o tamanho da fonte atual configurado
+            updateFontSize(setupFontSlider.value);
+            
             setTimeout(() => {
                 highlightWord(0);
             }, 100);
@@ -350,6 +395,9 @@
             pauseTeleprompter();
             prompterScreen.style.display = 'none';
             setupScreen.style.display = 'flex';
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            }
         }
 
         function togglePlay() {
@@ -418,13 +466,36 @@
             }
         }
 
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log(`Erro ao ativar tela cheia: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // Listener para atualizar o texto do botão de tela cheia
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                fsBtn.innerText = "Sair Tela Cheia";
+                fsBtn.style.backgroundColor = "#4f46e5";
+            } else {
+                fsBtn.innerText = "Tela Cheia";
+                fsBtn.style.backgroundColor = "#6366f1";
+            }
+        });
+
         document.addEventListener('keydown', (event) => {
             if (prompterScreen.style.display === 'block') {
                 if (event.code === 'Space') {
                     event.preventDefault();
                     togglePlay();
                 } else if (event.code === 'Escape') {
-                    stopTeleprompter();
+                    if (!document.fullscreenElement) {
+                        stopTeleprompter();
+                    }
                 }
             }
         });
