@@ -26,7 +26,7 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             overflow: hidden;
-            touch-action: manipulation; /* Evita zoom indesejado no celular */
+            touch-action: manipulation; 
         }
 
         /* --- TELA DE CONFIGURAÇÃO --- */
@@ -135,9 +135,11 @@
             width: 100vw;
             height: 100vh;
             position: relative;
+            overflow-y: auto; /* Correção: Permite que a tela do prompter role */
+            overflow-x: hidden;
+            scroll-behavior: smooth;
         }
 
-        /* Adicionado cursor pointer para indicar que a tela é clicável */
         #text-container {
             padding: 50vh 10% 50vh 10%; 
             font-size: 80px; 
@@ -147,8 +149,7 @@
             transition: transform 0.3s;
             direction: ltr; 
             cursor: pointer; 
-            height: 100%;
-            overflow: visible;
+            /* Removido o height: 100% que estava travando a rolagem */
         }
 
         .word {
@@ -250,19 +251,16 @@
 
         #eye-btn:hover { background: rgba(0,0,0,0.9); }
 
-        /* Classe que oculta a UI */
         .ui-hidden {
             opacity: 0;
             pointer-events: none;
             transform: translateY(-20px);
         }
         
-        /* O olho fica quase invisível quando os controles estão ocultos */
         .eye-dimmed {
             opacity: 0.2;
         }
 
-        /* Responsividade para celular */
         @media (max-width: 768px) {
             #floating-controls { top: auto; bottom: 80px; justify-content: center; }
             .float-slider-container { border: none; width: 100%; justify-content: space-between; }
@@ -330,14 +328,12 @@
         </div>
 
         <button id="eye-btn" onclick="toggleUI()" title="Ocultar Comandos">
-            <!-- Ícone de Olho SVG -->
             <svg id="eye-icon-open" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                 <circle cx="12" cy="12" r="3"></circle>
             </svg>
         </button>
 
-        <!-- Adicionado onclick para tocar em qualquer parte do texto e pausar/iniciar -->
         <div id="text-container" onclick="togglePlay(event)"></div>
     </div>
 
@@ -388,7 +384,7 @@
             
             if (currentIndex > 0) {
                 const targetWord = document.getElementById(`word-${currentIndex}`);
-                if (targetWord) targetWord.scrollIntoView({ behavior: 'auto', block: 'center' });
+                if (targetWord) targetWord.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
 
@@ -437,6 +433,9 @@
             updatePlayBtnUI();
             updateFontSize(setupFontSlider.value);
             
+            // Força a barra de rolagem a voltar para o topo ao iniciar
+            prompterScreen.scrollTop = 0;
+            
             setTimeout(() => {
                 highlightWord(0);
             }, 100);
@@ -452,7 +451,6 @@
         }
 
         function togglePlay(event) {
-            // Evita que clicar no botão dispare o clique no texto caso sobreponha
             if (event) event.stopPropagation(); 
             
             if (currentIndex >= wordsArray.length) {
@@ -520,7 +518,6 @@
             }
         }
 
-        /* Funcionalidade de Ocultar Comandos */
         function toggleUI() {
             uiVisible = !uiVisible;
             if (uiVisible) {
@@ -534,13 +531,12 @@
             }
         }
 
-        /* Tela cheia com suporte ampliado para iOS/Safari */
         function toggleFullScreen() {
             const doc = document.documentElement;
             if (!document.fullscreenElement && !document.webkitFullscreenElement) {
                 if (doc.requestFullscreen) {
                     doc.requestFullscreen().catch(err => console.log(err));
-                } else if (doc.webkitRequestFullscreen) { /* Safari/iOS antigo */
+                } else if (doc.webkitRequestFullscreen) {
                     doc.webkitRequestFullscreen();
                 } else {
                     alert("Seu navegador limita a tela cheia. No iPhone, use o Safari e clique em 'Adicionar à Tela de Início'.");
@@ -558,7 +554,6 @@
             }
         }
 
-        // Listener para mudar texto do botão Tela Cheia
         document.addEventListener('fullscreenchange', handleFSChange);
         document.addEventListener('webkitfullscreenchange', handleFSChange);
 
