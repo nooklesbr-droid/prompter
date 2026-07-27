@@ -8,8 +8,8 @@
         :root {
             --bg-color: #000000;
             --text-color: #ffffff;
-            --highlight-color: #fbbf24; /* Amarelo ouro para contraste */
-            --dim-color: #4b5563; /* Cinza escuro para texto já lido/futuro */
+            --highlight-color: #fbbf24; 
+            --dim-color: #4b5563; 
         }
 
         * {
@@ -64,14 +64,19 @@
 
         .controls-group {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
+            flex-direction: column;
             gap: 15px;
+            margin-bottom: 20px;
+            background: #1f1f1f;
+            padding: 15px;
+            border-radius: 8px;
         }
 
-        .control-item { display: flex; align-items: center; gap: 10px; }
+        .control-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
 
         input[type="number"] {
             width: 80px;
@@ -109,13 +114,14 @@
         }
 
         #text-container {
-            padding: 50vh 15% 50vh 15%; /* Espaçamento para o texto começar no meio e terminar no meio */
+            padding: 50vh 10% 50vh 10%; 
             font-size: 80px;
             line-height: 1.4;
             font-weight: bold;
             text-align: center;
-            /* Container configurado para aplicar o espelhamento */
             transition: transform 0.3s;
+            /* Garante que o alinhamento central não quebre ao espelhar */
+            direction: ltr; 
         }
 
         .word {
@@ -130,14 +136,14 @@
             text-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
         }
 
-        .word.read { color: var(--text-color); } /* Palavras já lidas ficam brancas */
+        .word.read { color: var(--text-color); }
 
-        .mirrored-xy {
-            /* Inverte na horizontal e na vertical simultaneamente */
-            transform: scaleX(-1) scaleY(-1);
-        }
+        /* Classes de espelhamento independentes */
+        .mirror-x { transform: scaleX(-1); }
+        .mirror-y { transform: scaleY(-1); }
+        .mirror-xy { transform: scaleX(-1) scaleY(-1); }
 
-        /* --- CONTROLES FLUTUANTES NO MODO PROMPTER --- */
+        /* --- CONTROLES FLUTUANTES --- */
         #floating-controls {
             position: fixed;
             top: 20px;
@@ -186,16 +192,22 @@
         <div class="setup-container">
             <h1>Teleprompter</h1>
             <p>Cole o seu roteiro abaixo:</p>
-            <textarea id="input-text" placeholder="Cole o texto do seu vídeo aqui..."></textarea>
+            <textarea id="input-text" placeholder="Cole o texto..."></textarea>
             
             <div class="controls-group">
-                <div class="control-item">
+                <div class="control-row">
                     <label for="input-speed">Velocidade (Palavras/Minuto):</label>
                     <input type="number" id="input-speed" value="130" min="50" max="300">
                 </div>
-                <div class="control-item">
-                    <input type="checkbox" id="input-mirror" checked>
-                    <label for="input-mirror">Modo Espelho de Teleprompter (Inverter Horizontal + Vertical)</label>
+                <hr style="width: 100%; border: 1px solid #333;">
+                <p style="margin: 0; color: #aaa; font-size: 14px;">Opções de Espelhamento (Testar na câmera):</p>
+                <div class="control-row">
+                    <input type="checkbox" id="mirror-x">
+                    <label for="mirror-x">Espelhar Horizontal (Esquerda/Direita)</label>
+                </div>
+                <div class="control-row">
+                    <input type="checkbox" id="mirror-y" checked>
+                    <label for="mirror-y">Espelhar Vertical (Cabeça para baixo)</label>
                 </div>
             </div>
 
@@ -212,7 +224,6 @@
             <button class="float-btn play-btn" id="play-pause-btn" onclick="togglePlay()">Play (Espaço)</button>
         </div>
 
-        <!-- Área onde o texto vai rolar -->
         <div id="text-container"></div>
     </div>
 
@@ -230,21 +241,27 @@
 
         function startTeleprompter() {
             const rawText = document.getElementById('input-text').value.trim();
-            const useMirror = document.getElementById('input-mirror').checked;
+            const mirrorX = document.getElementById('mirror-x').checked;
+            const mirrorY = document.getElementById('mirror-y').checked;
             
             if (!rawText) {
                 alert("Por favor, insira um texto para o teleprompter.");
                 return;
             }
 
-            // Configurar espelhamento
-            if (useMirror) {
-                textContainer.classList.add('mirrored-xy');
-            } else {
-                textContainer.classList.remove('mirrored-xy');
+            // Reseta classes
+            textContainer.className = '';
+            
+            // Aplica a transformação correta baseada nas marcações
+            if (mirrorX && mirrorY) {
+                textContainer.classList.add('mirror-xy');
+            } else if (mirrorX) {
+                textContainer.classList.add('mirror-x');
+            } else if (mirrorY) {
+                textContainer.classList.add('mirror-y');
             }
 
-            // Quebrar texto em palavras, mantendo as quebras de linha básicas onde houver
+            // Processar texto
             textContainer.innerHTML = '';
             wordsArray = rawText.split(/\s+/).filter(word => word.length > 0);
             
@@ -257,7 +274,6 @@
                 textContainer.appendChild(document.createTextNode(' '));
             });
 
-            // Trocar telas
             setupScreen.style.display = 'none';
             prompterScreen.style.display = 'block';
             
@@ -265,7 +281,6 @@
             isPlaying = false;
             updatePlayBtnUI();
             
-            // Focar na primeira palavra (com pequeno delay para a renderização ocorrer)
             setTimeout(() => {
                 highlightWord(0);
             }, 100);
@@ -279,25 +294,18 @@
 
         function togglePlay() {
             if (currentIndex >= wordsArray.length) {
-                // Reinicia se chegou no fim
                 currentIndex = 0;
                 highlightWord(0);
             }
-
-            if (isPlaying) {
-                pauseTeleprompter();
-            } else {
-                playTeleprompter();
-            }
+            if (isPlaying) pauseTeleprompter();
+            else playTeleprompter();
         }
 
         function playTeleprompter() {
             if (currentIndex >= wordsArray.length) return;
-            
             isPlaying = true;
             updatePlayBtnUI();
             
-            // Calcula o tempo entre cada palavra com base nas PPM (Palavras Por Minuto)
             const ppm = parseInt(document.getElementById('input-speed').value) || 130;
             const msPerWord = 60000 / ppm;
 
@@ -335,32 +343,24 @@
         }
 
         function highlightWord(index) {
-            // Remove o destaque ativo de todos e aplica a classe 'read' aos anteriores
             const allWords = document.querySelectorAll('.word');
             allWords.forEach((el, i) => {
                 el.classList.remove('active');
-                if (i < index) {
-                    el.classList.add('read');
-                } else {
-                    el.classList.remove('read');
-                }
+                if (i < index) el.classList.add('read');
+                else el.classList.remove('read');
             });
 
-            // Adiciona o destaque atual
             const targetWord = document.getElementById(`word-${index}`);
             if (targetWord) {
                 targetWord.classList.add('active');
-                
-                // Rola a tela suavemente para manter a palavra atual centralizada verticalmente
                 targetWord.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
 
-        // Adiciona suporte a atalhos de teclado (Barra de Espaço para Play/Pause)
         document.addEventListener('keydown', (event) => {
             if (prompterScreen.style.display === 'block') {
                 if (event.code === 'Space') {
-                    event.preventDefault(); // Evita que a página role acidentalmente
+                    event.preventDefault();
                     togglePlay();
                 } else if (event.code === 'Escape') {
                     stopTeleprompter();
