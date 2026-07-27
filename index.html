@@ -75,17 +75,38 @@
         .control-row {
             display: flex;
             align-items: center;
-            gap: 10px;
+            justify-content: space-between;
+            gap: 15px;
+            width: 100%;
         }
 
-        input[type="number"] {
+        /* Estilo da barra deslizante (Slider) */
+        input[type="range"] {
+            flex-grow: 1;
+            cursor: pointer;
+            height: 6px;
+            background: #444;
+            border-radius: 5px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--highlight-color);
+            cursor: pointer;
+        }
+
+        .speed-display {
             width: 80px;
-            padding: 8px;
-            background: #111;
-            color: #fff;
-            border: 1px solid #444;
-            border-radius: 6px;
-            text-align: center;
+            text-align: right;
+            font-weight: bold;
+            font-size: 16px;
+            color: var(--highlight-color);
         }
 
         input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
@@ -120,7 +141,6 @@
             font-weight: bold;
             text-align: center;
             transition: transform 0.3s;
-            /* Garante que o alinhamento central não quebre ao espelhar */
             direction: ltr; 
         }
 
@@ -138,7 +158,6 @@
 
         .word.read { color: var(--text-color); }
 
-        /* Classes de espelhamento independentes */
         .mirror-x { transform: scaleX(-1); }
         .mirror-y { transform: scaleY(-1); }
         .mirror-xy { transform: scaleX(-1) scaleY(-1); }
@@ -150,11 +169,20 @@
             right: 20px;
             z-index: 1000;
             display: flex;
-            gap: 10px;
-            background: rgba(0,0,0,0.7);
-            padding: 10px;
+            align-items: center;
+            gap: 15px;
+            background: rgba(0,0,0,0.8);
+            padding: 12px 20px;
             border-radius: 8px;
             border: 1px solid #444;
+        }
+
+        .float-speed-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-right: 1px solid #555;
+            padding-right: 15px;
         }
 
         .float-btn {
@@ -167,7 +195,7 @@
             cursor: pointer;
         }
         .float-btn:hover { background: #555; }
-        .play-btn { background: #059669; border-color: #047857; }
+        .play-btn { background: #059669; border-color: #047857; min-width: 140px; }
         .play-btn:hover { background: #047857; }
         
         #status-indicator {
@@ -195,17 +223,21 @@
             <textarea id="input-text" placeholder="Cole o texto..."></textarea>
             
             <div class="controls-group">
+                <!-- Controle de Velocidade com Slider -->
                 <div class="control-row">
-                    <label for="input-speed">Velocidade (Palavras/Minuto):</label>
-                    <input type="number" id="input-speed" value="130" min="50" max="300">
+                    <label>Velocidade:</label>
+                    <input type="range" id="setup-speed-slider" min="50" max="300" value="130">
+                    <span id="setup-speed-display" class="speed-display">130 PPM</span>
                 </div>
-                <hr style="width: 100%; border: 1px solid #333;">
+                
+                <hr style="width: 100%; border: 1px solid #333; margin: 5px 0;">
+                
                 <p style="margin: 0; color: #aaa; font-size: 14px;">Opções de Espelhamento (Testar na câmera):</p>
-                <div class="control-row">
+                <div class="control-row" style="justify-content: flex-start;">
                     <input type="checkbox" id="mirror-x">
                     <label for="mirror-x">Espelhar Horizontal (Esquerda/Direita)</label>
                 </div>
-                <div class="control-row">
+                <div class="control-row" style="justify-content: flex-start;">
                     <input type="checkbox" id="mirror-y" checked>
                     <label for="mirror-y">Espelhar Vertical (Cabeça para baixo)</label>
                 </div>
@@ -220,6 +252,13 @@
         <div id="status-indicator">PAUSADO</div>
         
         <div id="floating-controls">
+            <!-- Ajuste de velocidade direto na tela de leitura -->
+            <div class="float-speed-container">
+                <span style="font-size: 14px;">Velocidade:</span>
+                <input type="range" id="float-speed-slider" min="50" max="300" value="130" style="width: 100px;">
+                <span id="float-speed-display" class="speed-display" style="width: 65px;">130</span>
+            </div>
+            
             <button class="float-btn" onclick="stopTeleprompter()">Voltar</button>
             <button class="float-btn play-btn" id="play-pause-btn" onclick="togglePlay()">Play (Espaço)</button>
         </div>
@@ -232,12 +271,36 @@
         let currentIndex = 0;
         let isPlaying = false;
         let intervalId = null;
+        let currentPPM = 130;
         
         const setupScreen = document.getElementById('setup-screen');
         const prompterScreen = document.getElementById('teleprompter-screen');
         const textContainer = document.getElementById('text-container');
         const playPauseBtn = document.getElementById('play-pause-btn');
         const statusIndicator = document.getElementById('status-indicator');
+
+        // Sincronização dos Sliders (Tela inicial <-> Tela Teleprompter)
+        const setupSlider = document.getElementById('setup-speed-slider');
+        const setupDisplay = document.getElementById('setup-speed-display');
+        const floatSlider = document.getElementById('float-speed-slider');
+        const floatDisplay = document.getElementById('float-speed-display');
+
+        function updateSpeed(value) {
+            currentPPM = parseInt(value);
+            setupSlider.value = currentPPM;
+            setupDisplay.innerText = currentPPM + " PPM";
+            floatSlider.value = currentPPM;
+            floatDisplay.innerText = currentPPM;
+
+            // Se alterar a velocidade enquanto estiver rodando, atualiza o ritmo em tempo real
+            if (isPlaying) {
+                clearInterval(intervalId);
+                startInterval();
+            }
+        }
+
+        setupSlider.addEventListener('input', (e) => updateSpeed(e.target.value));
+        floatSlider.addEventListener('input', (e) => updateSpeed(e.target.value));
 
         function startTeleprompter() {
             const rawText = document.getElementById('input-text').value.trim();
@@ -249,10 +312,8 @@
                 return;
             }
 
-            // Reseta classes
             textContainer.className = '';
             
-            // Aplica a transformação correta baseada nas marcações
             if (mirrorX && mirrorY) {
                 textContainer.classList.add('mirror-xy');
             } else if (mirrorX) {
@@ -261,7 +322,6 @@
                 textContainer.classList.add('mirror-y');
             }
 
-            // Processar texto
             textContainer.innerHTML = '';
             wordsArray = rawText.split(/\s+/).filter(word => word.length > 0);
             
@@ -305,10 +365,11 @@
             if (currentIndex >= wordsArray.length) return;
             isPlaying = true;
             updatePlayBtnUI();
-            
-            const ppm = parseInt(document.getElementById('input-speed').value) || 130;
-            const msPerWord = 60000 / ppm;
+            startInterval();
+        }
 
+        function startInterval() {
+            const msPerWord = 60000 / currentPPM;
             intervalId = setInterval(() => {
                 if (currentIndex < wordsArray.length - 1) {
                     currentIndex++;
