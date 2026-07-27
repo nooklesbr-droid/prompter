@@ -2,7 +2,10 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Meta tags para tela cheia nativa no iPhone (Adicionar à Tela de Início) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Teleprompter Pro</title>
     <style>
         :root {
@@ -23,6 +26,7 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             overflow: hidden;
+            touch-action: manipulation; /* Evita zoom indesejado no celular */
         }
 
         /* --- TELA DE CONFIGURAÇÃO --- */
@@ -80,7 +84,6 @@
             width: 100%;
         }
 
-        /* Estilo das barras deslizantes (Sliders) */
         input[type="range"] {
             flex-grow: 1;
             cursor: pointer;
@@ -94,8 +97,8 @@
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 20px;
-            height: 20px;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
             background: var(--highlight-color);
             cursor: pointer;
@@ -109,13 +112,13 @@
             color: var(--highlight-color);
         }
 
-        input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
+        input[type="checkbox"] { width: 24px; height: 24px; cursor: pointer; }
 
         .btn {
             background: #2563eb;
             color: white;
             border: none;
-            padding: 12px 24px;
+            padding: 15px 24px;
             font-size: 18px;
             border-radius: 8px;
             cursor: pointer;
@@ -134,14 +137,18 @@
             position: relative;
         }
 
+        /* Adicionado cursor pointer para indicar que a tela é clicável */
         #text-container {
             padding: 50vh 10% 50vh 10%; 
-            font-size: 80px; /* Tamanho padrão, será alterado via JS */
+            font-size: 80px; 
             line-height: 1.4;
             font-weight: bold;
             text-align: center;
             transition: transform 0.3s;
             direction: ltr; 
+            cursor: pointer; 
+            height: 100%;
+            overflow: visible;
         }
 
         .word {
@@ -171,13 +178,14 @@
             display: flex;
             align-items: center;
             gap: 15px;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.85);
             padding: 12px 20px;
             border-radius: 8px;
             border: 1px solid #444;
             flex-wrap: wrap;
             justify-content: flex-end;
             max-width: 90vw;
+            transition: opacity 0.3s, transform 0.3s;
         }
 
         .float-slider-container {
@@ -209,7 +217,7 @@
             position: fixed;
             top: 20px;
             left: 20px;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.85);
             padding: 10px 15px;
             border-radius: 8px;
             font-size: 18px;
@@ -217,6 +225,48 @@
             color: #fbbf24;
             z-index: 1000;
             border: 1px solid #444;
+            transition: opacity 0.3s, transform 0.3s;
+        }
+
+        /* --- BOTAO OLHO PARA OCULTAR --- */
+        #eye-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid #555;
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            z-index: 1001;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: opacity 0.3s;
+        }
+
+        #eye-btn:hover { background: rgba(0,0,0,0.9); }
+
+        /* Classe que oculta a UI */
+        .ui-hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-20px);
+        }
+        
+        /* O olho fica quase invisível quando os controles estão ocultos */
+        .eye-dimmed {
+            opacity: 0.2;
+        }
+
+        /* Responsividade para celular */
+        @media (max-width: 768px) {
+            #floating-controls { top: auto; bottom: 80px; justify-content: center; }
+            .float-slider-container { border: none; width: 100%; justify-content: space-between; }
+            #status-indicator { top: auto; bottom: 20px; left: 20px; }
         }
     </style>
 </head>
@@ -226,27 +276,24 @@
     <div id="setup-screen">
         <div class="setup-container">
             <h1>Teleprompter</h1>
-            <p>Cole o seu roteiro abaixo:</p>
+            <p>Cole o roteiro abaixo:</p>
             <textarea id="input-text" placeholder="Cole o texto..."></textarea>
             
             <div class="controls-group">
-                <!-- Controle de Velocidade -->
                 <div class="control-row">
                     <label>Velocidade:</label>
                     <input type="range" id="setup-speed-slider" min="50" max="300" value="130">
                     <span id="setup-speed-display" class="slider-display">130 PPM</span>
                 </div>
                 
-                <!-- Controle de Tamanho da Letra -->
                 <div class="control-row">
-                    <label>Tamanho da Letra:</label>
+                    <label>Tamanho Letra:</label>
                     <input type="range" id="setup-font-slider" min="40" max="150" value="80">
                     <span id="setup-font-display" class="slider-display">80px</span>
                 </div>
                 
                 <hr style="width: 100%; border: 1px solid #333; margin: 5px 0;">
                 
-                <p style="margin: 0; color: #aaa; font-size: 14px;">Opções de Espelhamento:</p>
                 <div class="control-row" style="justify-content: flex-start;">
                     <input type="checkbox" id="mirror-x">
                     <label for="mirror-x">Espelhar Horizontal (Esquerda/Direita)</label>
@@ -266,25 +313,32 @@
         <div id="status-indicator">PAUSADO</div>
         
         <div id="floating-controls">
-            <!-- Tamanho da Letra Flutuante -->
             <div class="float-slider-container">
                 <span style="font-size: 14px;">Letra:</span>
-                <input type="range" id="float-font-slider" min="40" max="150" value="80" style="width: 80px;">
+                <input type="range" id="float-font-slider" min="40" max="150" value="80" style="width: 70px;">
             </div>
 
-            <!-- Velocidade Flutuante -->
             <div class="float-slider-container">
                 <span style="font-size: 14px;">Veloc:</span>
-                <input type="range" id="float-speed-slider" min="50" max="300" value="130" style="width: 100px;">
+                <input type="range" id="float-speed-slider" min="50" max="300" value="130" style="width: 80px;">
                 <span id="float-speed-display" class="slider-display" style="width: 35px; font-size: 14px;">130</span>
             </div>
             
             <button class="float-btn fs-btn" id="fs-btn" onclick="toggleFullScreen()">Tela Cheia</button>
             <button class="float-btn" onclick="stopTeleprompter()">Voltar</button>
-            <button class="float-btn play-btn" id="play-pause-btn" onclick="togglePlay()">Play (Espaço)</button>
+            <button class="float-btn play-btn" id="play-pause-btn" onclick="togglePlay(event)">Play (Toque)</button>
         </div>
 
-        <div id="text-container"></div>
+        <button id="eye-btn" onclick="toggleUI()" title="Ocultar Comandos">
+            <!-- Ícone de Olho SVG -->
+            <svg id="eye-icon-open" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+        </button>
+
+        <!-- Adicionado onclick para tocar em qualquer parte do texto e pausar/iniciar -->
+        <div id="text-container" onclick="togglePlay(event)"></div>
     </div>
 
     <script>
@@ -293,6 +347,7 @@
         let isPlaying = false;
         let intervalId = null;
         let currentPPM = 130;
+        let uiVisible = true;
         
         const setupScreen = document.getElementById('setup-screen');
         const prompterScreen = document.getElementById('teleprompter-screen');
@@ -300,14 +355,14 @@
         const playPauseBtn = document.getElementById('play-pause-btn');
         const statusIndicator = document.getElementById('status-indicator');
         const fsBtn = document.getElementById('fs-btn');
+        const floatingControls = document.getElementById('floating-controls');
+        const eyeBtn = document.getElementById('eye-btn');
 
-        // Sincronização Velocidade
         const setupSpeedSlider = document.getElementById('setup-speed-slider');
         const setupSpeedDisplay = document.getElementById('setup-speed-display');
         const floatSpeedSlider = document.getElementById('float-speed-slider');
         const floatSpeedDisplay = document.getElementById('float-speed-display');
 
-        // Sincronização Tamanho da Letra
         const setupFontSlider = document.getElementById('setup-font-slider');
         const setupFontDisplay = document.getElementById('setup-font-display');
         const floatFontSlider = document.getElementById('float-font-slider');
@@ -331,7 +386,6 @@
             floatFontSlider.value = value;
             textContainer.style.fontSize = value + "px";
             
-            // Re-centraliza a palavra atual se a letra mudar de tamanho durante o play
             if (currentIndex > 0) {
                 const targetWord = document.getElementById(`word-${currentIndex}`);
                 if (targetWord) targetWord.scrollIntoView({ behavior: 'auto', block: 'center' });
@@ -340,7 +394,6 @@
 
         setupSpeedSlider.addEventListener('input', (e) => updateSpeed(e.target.value));
         floatSpeedSlider.addEventListener('input', (e) => updateSpeed(e.target.value));
-        
         setupFontSlider.addEventListener('input', (e) => updateFontSize(e.target.value));
         floatFontSlider.addEventListener('input', (e) => updateFontSize(e.target.value));
 
@@ -350,7 +403,7 @@
             const mirrorY = document.getElementById('mirror-y').checked;
             
             if (!rawText) {
-                alert("Por favor, insira um texto para o teleprompter.");
+                alert("Por favor, insira um texto.");
                 return;
             }
 
@@ -382,8 +435,6 @@
             currentIndex = 0;
             isPlaying = false;
             updatePlayBtnUI();
-            
-            // Aplica o tamanho da fonte atual configurado
             updateFontSize(setupFontSlider.value);
             
             setTimeout(() => {
@@ -395,12 +446,15 @@
             pauseTeleprompter();
             prompterScreen.style.display = 'none';
             setupScreen.style.display = 'flex';
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
+            if (document.fullscreenElement || document.webkitFullscreenElement) {
+                exitFullScreen();
             }
         }
 
-        function togglePlay() {
+        function togglePlay(event) {
+            // Evita que clicar no botão dispare o clique no texto caso sobreponha
+            if (event) event.stopPropagation(); 
+            
             if (currentIndex >= wordsArray.length) {
                 currentIndex = 0;
                 highlightWord(0);
@@ -424,7 +478,7 @@
                     highlightWord(currentIndex);
                 } else {
                     pauseTeleprompter();
-                    statusIndicator.innerText = "FIM DO TEXTO";
+                    statusIndicator.innerText = "FIM";
                 }
             }, msPerWord);
         }
@@ -437,13 +491,13 @@
 
         function updatePlayBtnUI() {
             if (isPlaying) {
-                playPauseBtn.innerText = "Pause (Espaço)";
+                playPauseBtn.innerText = "Pause";
                 playPauseBtn.style.backgroundColor = "#b91c1c";
                 playPauseBtn.style.borderColor = "#991b1b";
                 statusIndicator.innerText = "GRAVANDO...";
                 statusIndicator.style.color = "#ef4444";
             } else {
-                playPauseBtn.innerText = "Play (Espaço)";
+                playPauseBtn.innerText = "Play";
                 playPauseBtn.style.backgroundColor = "#059669";
                 playPauseBtn.style.borderColor = "#047857";
                 statusIndicator.innerText = "PAUSADO";
@@ -466,26 +520,57 @@
             }
         }
 
-        function toggleFullScreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    console.log(`Erro ao ativar tela cheia: ${err.message}`);
-                });
+        /* Funcionalidade de Ocultar Comandos */
+        function toggleUI() {
+            uiVisible = !uiVisible;
+            if (uiVisible) {
+                floatingControls.classList.remove('ui-hidden');
+                statusIndicator.classList.remove('ui-hidden');
+                eyeBtn.classList.remove('eye-dimmed');
             } else {
-                document.exitFullscreen();
+                floatingControls.classList.add('ui-hidden');
+                statusIndicator.classList.add('ui-hidden');
+                eyeBtn.classList.add('eye-dimmed');
             }
         }
 
-        // Listener para atualizar o texto do botão de tela cheia
-        document.addEventListener('fullscreenchange', () => {
-            if (document.fullscreenElement) {
+        /* Tela cheia com suporte ampliado para iOS/Safari */
+        function toggleFullScreen() {
+            const doc = document.documentElement;
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                if (doc.requestFullscreen) {
+                    doc.requestFullscreen().catch(err => console.log(err));
+                } else if (doc.webkitRequestFullscreen) { /* Safari/iOS antigo */
+                    doc.webkitRequestFullscreen();
+                } else {
+                    alert("Seu navegador limita a tela cheia. No iPhone, use o Safari e clique em 'Adicionar à Tela de Início'.");
+                }
+            } else {
+                exitFullScreen();
+            }
+        }
+
+        function exitFullScreen() {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            }
+        }
+
+        // Listener para mudar texto do botão Tela Cheia
+        document.addEventListener('fullscreenchange', handleFSChange);
+        document.addEventListener('webkitfullscreenchange', handleFSChange);
+
+        function handleFSChange() {
+            if (document.fullscreenElement || document.webkitFullscreenElement) {
                 fsBtn.innerText = "Sair Tela Cheia";
                 fsBtn.style.backgroundColor = "#4f46e5";
             } else {
                 fsBtn.innerText = "Tela Cheia";
                 fsBtn.style.backgroundColor = "#6366f1";
             }
-        });
+        }
 
         document.addEventListener('keydown', (event) => {
             if (prompterScreen.style.display === 'block') {
@@ -493,7 +578,7 @@
                     event.preventDefault();
                     togglePlay();
                 } else if (event.code === 'Escape') {
-                    if (!document.fullscreenElement) {
+                    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
                         stopTeleprompter();
                     }
                 }
