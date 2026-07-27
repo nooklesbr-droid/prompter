@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teleprompter Pro</title>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --text-color: #ffffff;
+            --highlight-color: #fbbf24; /* Amarelo ouro para contraste */
+            --dim-color: #4b5563; /* Cinza escuro para texto já lido/futuro */
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+        }
+
+        /* --- TELA DE CONFIGURAÇÃO --- */
+        #setup-screen {
+            background-color: #1a1a1a;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .setup-container {
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 800px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        h1 { margin-top: 0; text-align: center; }
+
+        textarea {
+            width: 100%;
+            height: 300px;
+            padding: 15px;
+            background: #111;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 8px;
+            font-size: 16px;
+            resize: vertical;
+            margin-bottom: 20px;
+        }
+
+        .controls-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .control-item { display: flex; align-items: center; gap: 10px; }
+
+        input[type="number"] {
+            width: 80px;
+            padding: 8px;
+            background: #111;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
+
+        .btn {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-weight: bold;
+            width: 100%;
+        }
+
+        .btn:hover { background: #1d4ed8; }
+
+        /* --- TELA DO TELEPROMPTER --- */
+        #teleprompter-screen {
+            display: none;
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        #text-container {
+            padding: 50vh 15% 50vh 15%; /* Espaçamento para o texto começar no meio e terminar no meio */
+            font-size: 80px;
+            line-height: 1.4;
+            font-weight: bold;
+            text-align: center;
+            /* Container configurado para aplicar o espelhamento */
+            transition: transform 0.3s;
+        }
+
+        .word {
+            color: var(--dim-color);
+            transition: color 0.1s;
+            display: inline-block;
+            margin-right: 15px;
+        }
+
+        .word.active {
+            color: var(--highlight-color);
+            text-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+        }
+
+        .word.read { color: var(--text-color); } /* Palavras já lidas ficam brancas */
+
+        .mirrored-xy {
+            /* Inverte na horizontal e na vertical simultaneamente */
+            transform: scaleX(-1) scaleY(-1);
+        }
+
+        /* --- CONTROLES FLUTUANTES NO MODO PROMPTER --- */
+        #floating-controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            gap: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+
+        .float-btn {
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            padding: 10px 15px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .float-btn:hover { background: #555; }
+        .play-btn { background: #059669; border-color: #047857; }
+        .play-btn:hover { background: #047857; }
+        
+        #status-indicator {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #fbbf24;
+            z-index: 1000;
+            border: 1px solid #444;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TELA 1: CONFIGURAÇÃO -->
+    <div id="setup-screen">
+        <div class="setup-container">
+            <h1>Teleprompter</h1>
+            <p>Cole o seu roteiro abaixo:</p>
+            <textarea id="input-text" placeholder="Cole o texto do seu vídeo aqui..."></textarea>
+            
+            <div class="controls-group">
+                <div class="control-item">
+                    <label for="input-speed">Velocidade (Palavras/Minuto):</label>
+                    <input type="number" id="input-speed" value="130" min="50" max="300">
+                </div>
+                <div class="control-item">
+                    <input type="checkbox" id="input-mirror" checked>
+                    <label for="input-mirror">Modo Espelho de Teleprompter (Inverter Horizontal + Vertical)</label>
+                </div>
+            </div>
+
+            <button class="btn" onclick="startTeleprompter()">Iniciar Teleprompter</button>
+        </div>
+    </div>
+
+    <!-- TELA 2: TELEPROMPTER -->
+    <div id="teleprompter-screen">
+        <div id="status-indicator">PAUSADO</div>
+        
+        <div id="floating-controls">
+            <button class="float-btn" onclick="stopTeleprompter()">Voltar</button>
+            <button class="float-btn play-btn" id="play-pause-btn" onclick="togglePlay()">Play (Espaço)</button>
+        </div>
+
+        <!-- Área onde o texto vai rolar -->
+        <div id="text-container"></div>
+    </div>
+
+    <script>
+        let wordsArray = [];
+        let currentIndex = 0;
+        let isPlaying = false;
+        let intervalId = null;
+        
+        const setupScreen = document.getElementById('setup-screen');
+        const prompterScreen = document.getElementById('teleprompter-screen');
+        const textContainer = document.getElementById('text-container');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const statusIndicator = document.getElementById('status-indicator');
+
+        function startTeleprompter() {
+            const rawText = document.getElementById('input-text').value.trim();
+            const useMirror = document.getElementById('input-mirror').checked;
+            
+            if (!rawText) {
+                alert("Por favor, insira um texto para o teleprompter.");
+                return;
+            }
+
+            // Configurar espelhamento
+            if (useMirror) {
+                textContainer.classList.add('mirrored-xy');
+            } else {
+                textContainer.classList.remove('mirrored-xy');
+            }
+
+            // Quebrar texto em palavras, mantendo as quebras de linha básicas onde houver
+            textContainer.innerHTML = '';
+            wordsArray = rawText.split(/\s+/).filter(word => word.length > 0);
+            
+            wordsArray.forEach((word, index) => {
+                const span = document.createElement('span');
+                span.className = 'word';
+                span.id = `word-${index}`;
+                span.innerText = word;
+                textContainer.appendChild(span);
+                textContainer.appendChild(document.createTextNode(' '));
+            });
+
+            // Trocar telas
+            setupScreen.style.display = 'none';
+            prompterScreen.style.display = 'block';
+            
+            currentIndex = 0;
+            isPlaying = false;
+            updatePlayBtnUI();
+            
+            // Focar na primeira palavra (com pequeno delay para a renderização ocorrer)
+            setTimeout(() => {
+                highlightWord(0);
+            }, 100);
+        }
+
+        function stopTeleprompter() {
+            pauseTeleprompter();
+            prompterScreen.style.display = 'none';
+            setupScreen.style.display = 'flex';
+        }
+
+        function togglePlay() {
+            if (currentIndex >= wordsArray.length) {
+                // Reinicia se chegou no fim
+                currentIndex = 0;
+                highlightWord(0);
+            }
+
+            if (isPlaying) {
+                pauseTeleprompter();
+            } else {
+                playTeleprompter();
+            }
+        }
+
+        function playTeleprompter() {
+            if (currentIndex >= wordsArray.length) return;
+            
+            isPlaying = true;
+            updatePlayBtnUI();
+            
+            // Calcula o tempo entre cada palavra com base nas PPM (Palavras Por Minuto)
+            const ppm = parseInt(document.getElementById('input-speed').value) || 130;
+            const msPerWord = 60000 / ppm;
+
+            intervalId = setInterval(() => {
+                if (currentIndex < wordsArray.length - 1) {
+                    currentIndex++;
+                    highlightWord(currentIndex);
+                } else {
+                    pauseTeleprompter();
+                    statusIndicator.innerText = "FIM DO TEXTO";
+                }
+            }, msPerWord);
+        }
+
+        function pauseTeleprompter() {
+            isPlaying = false;
+            clearInterval(intervalId);
+            updatePlayBtnUI();
+        }
+
+        function updatePlayBtnUI() {
+            if (isPlaying) {
+                playPauseBtn.innerText = "Pause (Espaço)";
+                playPauseBtn.style.backgroundColor = "#b91c1c";
+                playPauseBtn.style.borderColor = "#991b1b";
+                statusIndicator.innerText = "GRAVANDO...";
+                statusIndicator.style.color = "#ef4444";
+            } else {
+                playPauseBtn.innerText = "Play (Espaço)";
+                playPauseBtn.style.backgroundColor = "#059669";
+                playPauseBtn.style.borderColor = "#047857";
+                statusIndicator.innerText = "PAUSADO";
+                statusIndicator.style.color = "#fbbf24";
+            }
+        }
+
+        function highlightWord(index) {
+            // Remove o destaque ativo de todos e aplica a classe 'read' aos anteriores
+            const allWords = document.querySelectorAll('.word');
+            allWords.forEach((el, i) => {
+                el.classList.remove('active');
+                if (i < index) {
+                    el.classList.add('read');
+                } else {
+                    el.classList.remove('read');
+                }
+            });
+
+            // Adiciona o destaque atual
+            const targetWord = document.getElementById(`word-${index}`);
+            if (targetWord) {
+                targetWord.classList.add('active');
+                
+                // Rola a tela suavemente para manter a palavra atual centralizada verticalmente
+                targetWord.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // Adiciona suporte a atalhos de teclado (Barra de Espaço para Play/Pause)
+        document.addEventListener('keydown', (event) => {
+            if (prompterScreen.style.display === 'block') {
+                if (event.code === 'Space') {
+                    event.preventDefault(); // Evita que a página role acidentalmente
+                    togglePlay();
+                } else if (event.code === 'Escape') {
+                    stopTeleprompter();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
